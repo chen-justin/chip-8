@@ -41,7 +41,6 @@ func PrintDisplay(display [32][64]bool) {
 	for y := range display {
 		for x := range display[y] {
 			if display[y][x] {
-
 				fmt.Print("#")
 			} else {
 				fmt.Print(" ")
