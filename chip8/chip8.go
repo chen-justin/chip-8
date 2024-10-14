@@ -48,15 +48,25 @@ func Init() Chip8 {
 	}
 	buffer := 0x50
 	for i := buffer; i < len(fontSet)+buffer; i++ {
-		instance.memory[i] = fontSet[i]
+		instance.memory[i] = fontSet[i-buffer]
 	}
-	// for i := 0; i < len(fontSet); i++ {
-	// 	instance.memory[i] = fontSet[i]
-	// }
 	return instance
 }
 
+func (c *Chip8) GetDisplay() [32][64]bool {
+	return c.display
+}
+
+func (c *Chip8) Debug() {
+	fmt.Println("pc:", c.pc)
+	fmt.Println("i:", c.i)
+	fmt.Println("vx:", c.register)
+	fmt.Println("stack:", c.stack)
+	fmt.Printf("sp: %d\n", c.sp)
+}
+
 func (c *Chip8) Fetch() uint16 {
+	fmt.Println("fetching: ", c.pc, "from ", len(c.memory))
 	opcode := uint16(c.memory[c.pc])<<8 | uint16(c.memory[c.pc+1])
 	c.pc += 2
 	return opcode
@@ -69,26 +79,36 @@ func (c *Chip8) Execute(opcode uint16) error {
 	Y := uint8((opcode & 0x00F0) >> 4)
 	N := uint8(opcode & 0x000F)
 	NN := uint8(opcode & 0x00FF)
-	NNN := opcode & 0x0FFFF
+	NNN := opcode & 0x0FFF
+
+	fmt.Printf("%s %x\n", "nibble:", (n1))
+	fmt.Printf("%s %d\n", "X: ", X)
+	fmt.Printf("%s %d\n", "Y: ", Y)
+	fmt.Printf("%s %d\n", "N: ", N)
+	fmt.Printf("%s %x - %d\n", "NN: ", NN, NN)
+	fmt.Printf("%s %x - %d\n", "NNN: ", NNN, NNN)
 	switch n1 {
 
 	case 0x0000:
 		switch NN {
 		case 0xE0: // clear Screen
 			for i := 0; i < len(c.display); i++ {
-				for j := 0; i < len(c.display[i]); j++ {
+				for j := 0; j < len(c.display[i]); j++ {
 					c.display[i][j] = false
 				}
 			}
 		case 0xEE: // return subroutine
-			c.pc = c.stack[c.sp]
 			c.sp -= 1
+			c.pc = c.stack[c.sp]
 		}
 	case 0x1000: // jump
 		c.pc = NNN
 	case 0x2000: // call subroutine
+		if int(c.sp) >= len(c.stack) {
+			return fmt.Errorf("stack overflow")
+		}
 		c.stack[c.sp] = c.pc
-		c.sp += 1
+		c.sp++
 		c.pc = NNN
 	case 0x3000: // skip if true
 		if c.register[X] == NN {
@@ -99,7 +119,7 @@ func (c *Chip8) Execute(opcode uint16) error {
 			c.pc += 2
 		}
 	case 0x5000: // skip if true
-		if X == Y {
+		if c.register[X] == c.register[Y] {
 			c.pc += 2
 		}
 	case 0x6000:
@@ -145,7 +165,7 @@ func (c *Chip8) Execute(opcode uint16) error {
 			c.register[0xF] = carry
 		}
 	case 0x9000: // skip if not true
-		if X != Y {
+		if c.register[X] != c.register[Y] {
 			c.pc += 2
 		}
 	case 0xA000:
@@ -160,17 +180,20 @@ func (c *Chip8) Execute(opcode uint16) error {
 		px := c.register[X] % 64
 		py := c.register[Y] % 32
 		c.register[0xF] = 0
-
+		fmt.Println("x,y: ", px, py)
 		for row := 0; row < int(N); row++ {
-			if int(py) > len(c.display) { // reached bottom edge of screen
+			if int(py) >= len(c.display) { // reached bottom edge of screen
 				continue
 			}
-			sbyte := uint8(c.i) + N
+			sbyte := c.memory[c.i+uint16(row)]
+			fmt.Printf("%s %x\n", "s: ", sbyte)
+			px := c.register[X] % 64
 			for bit := 0; bit < 8; bit++ {
-				if int(px) > len(c.display[py]) { // reached right edge of screen
+				if int(px) >= len(c.display[px]) { // reached right edge of screen
 					continue
 				}
-				spritePixel := int(sbyte) & bit
+				spritePixel := (sbyte >> (7 - bit)) & 0x01
+				// spritePixel := int(sbyte) & bit
 				displayPixel := c.display[py][px]
 				if spritePixel != 0 && displayPixel {
 					c.display[py][px] = false
@@ -210,12 +233,14 @@ func (c *Chip8) Execute(opcode uint16) error {
 			c.i = 0x50 + uint16(c.register[X]) //iffy
 		case 0x33: //binary-coded decimal conversion
 			temp := c.register[X]
-			i := 3
+			i := 2
 			for i >= 0 {
 				digit := temp % 10
 				c.memory[c.i+uint16(i)] = digit
 				temp /= 10
+				i--
 			}
+			// return fmt.Errorf("debug")
 		case 0x55:
 			for i := 0; i <= int(X); i += 1 {
 				c.memory[c.i+uint16(i)] = c.register[i]
@@ -251,6 +276,7 @@ func (c *Chip8) LoadProgram(fileName string) error {
 	if fStatErr != nil {
 		return fStatErr
 	}
+	fmt.Println("fileSize:", fStat.Size())
 	if int64(len(c.memory)-512) < fStat.Size() { // program is loaded at 0x200
 		return fmt.Errorf("program size bigger than memory")
 	}
@@ -260,9 +286,10 @@ func (c *Chip8) LoadProgram(fileName string) error {
 		return readErr
 	}
 
+	fmt.Println("buffer", len(buffer))
 	for i := 0; i < len(buffer); i++ {
 		c.memory[i+512] = buffer[i]
 	}
-
+	fmt.Println("successfully loaded: ", fileName)
 	return nil
 }
