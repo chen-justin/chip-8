@@ -1,16 +1,21 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"log"
 
 	"github.com/chen-justin/chip-8/chip8"
 )
 
 func main() {
+	romPath := flag.String("rom", ".roms/3-corax+.ch8", "path to a CHIP-8 ROM file to load")
+	flag.Parse()
 
 	c := chip8.Init()
-	c.LoadProgram(".roms/3-corax+.ch8")
-	// c.LoadProgram("./ibm.ch8")
+	if err := c.LoadProgram(*romPath); err != nil {
+		log.Fatalf("failed to load ROM %q: %v", *romPath, err)
+	}
 
 	// c.Debug()
 	// opcode := c.Fetch()

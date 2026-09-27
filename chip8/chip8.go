@@ -81,12 +81,12 @@ func (c *Chip8) Execute(opcode uint16) error {
 	NN := uint8(opcode & 0x00FF)
 	NNN := opcode & 0x0FFF
 
-	fmt.Printf("%s %x\n", "nibble:", (n1))
-	fmt.Printf("%s %d\n", "X: ", X)
-	fmt.Printf("%s %d\n", "Y: ", Y)
-	fmt.Printf("%s %d\n", "N: ", N)
-	fmt.Printf("%s %x - %d\n", "NN: ", NN, NN)
-	fmt.Printf("%s %x - %d\n", "NNN: ", NNN, NNN)
+	// fmt.Printf("%s %x\n", "nibble:", (n1))
+	// fmt.Printf("%s %d\n", "X: ", X)
+	// fmt.Printf("%s %d\n", "Y: ", Y)
+	// fmt.Printf("%s %d\n", "N: ", N)
+	// fmt.Printf("%s %x - %d\n", "NN: ", NN, NN)
+	// fmt.Printf("%s %x - %d\n", "NNN: ", NNN, NNN)
 	switch n1 {
 
 	case 0x0000:
@@ -144,14 +144,32 @@ func (c *Chip8) Execute(opcode uint16) error {
 			// logic xor
 			c.register[X] = c.register[X] ^ c.register[Y]
 		case 0x0004:
-			// add
-			c.register[X] = c.register[X] + c.register[Y]
+			// add, VF = carry
+			sum := uint16(c.register[X]) + uint16(c.register[Y])
+			c.register[X] = uint8(sum)
+			if sum > 0xFF {
+				c.register[0xF] = 1
+			} else {
+				c.register[0xF] = 0
+			}
 		case 0x0005:
-			// subtract
+			// subtract VX - VY, VF = NOT borrow
+			borrow := c.register[X] < c.register[Y]
 			c.register[X] = c.register[X] - c.register[Y]
+			if borrow {
+				c.register[0xF] = 0
+			} else {
+				c.register[0xF] = 1
+			}
 		case 0x0007:
-			// subtract
+			// subtract VY - VX, VF = NOT borrow
+			borrow := c.register[Y] < c.register[X]
 			c.register[X] = c.register[Y] - c.register[X]
+			if borrow {
+				c.register[0xF] = 0
+			} else {
+				c.register[0xF] = 1
+			}
 		case 0x0006:
 			// shift
 			c.register[X] = c.register[Y]
@@ -227,8 +245,18 @@ func (c *Chip8) Execute(opcode uint16) error {
 			c.st = c.register[X]
 		case 0x1E: // add to index
 			c.i += uint16(c.register[X])
-		case 0x0A: // get key
-			c.pc -= 2 // -1?
+		case 0x0A: // get key: block until some key is pressed
+			pressed := false
+			for k := uint8(0); k < uint8(len(c.key)); k++ {
+				if c.key[k] {
+					c.register[X] = k
+					pressed = true
+					break
+				}
+			}
+			if !pressed {
+				c.pc -= 2 // re-fetch this same instruction next cycle
+			}
 		case 0x29: //font character
 			c.i = 0x50 + uint16(c.register[X]) * 5 // every font character is 5 bytes
 		case 0x33: //binary-coded decimal conversion
@@ -266,30 +294,14 @@ func (c *Chip8) Execute(opcode uint16) error {
 }
 
 func (c *Chip8) LoadProgram(fileName string) error {
-	file, fileErr := os.OpenFile(fileName, os.O_RDONLY, 0777)
-	if fileErr != nil {
-		return fileErr
+	data, err := os.ReadFile(fileName)
+	if err != nil {
+		return err
 	}
-	defer file.Close()
-
-	fStat, fStatErr := file.Stat()
-	if fStatErr != nil {
-		return fStatErr
-	}
-	fmt.Println("fileSize:", fStat.Size())
-	if int64(len(c.memory)-512) < fStat.Size() { // program is loaded at 0x200
-		return fmt.Errorf("program size bigger than memory")
+	if len(data) > len(c.memory)-0x200 { // program is loaded at 0x200
+		return fmt.Errorf("program size %d bigger than available memory %d", len(data), len(c.memory)-0x200)
 	}
 
-	buffer := make([]byte, fStat.Size())
-	if _, readErr := file.Read(buffer); readErr != nil {
-		return readErr
-	}
-
-	fmt.Println("buffer", len(buffer))
-	for i := 0; i < len(buffer); i++ {
-		c.memory[i+512] = buffer[i]
-	}
-	fmt.Println("successfully loaded: ", fileName)
+	copy(c.memory[0x200:], data)
 	return nil
 }
