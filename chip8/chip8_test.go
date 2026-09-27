@@ -197,3 +197,49 @@ func TestClearScreen(t *testing.T) {
 		}
 	}
 }
+
+func TestGetKeyBlocksUntilPressed(t *testing.T) {
+	c := newTestChip8()
+	startPC := c.pc
+
+	// No key pressed: Fx0A must rewind pc so the same instruction re-fetches
+	// next cycle, and VX must stay untouched.
+	if err := c.Execute(0xF00A); err != nil {
+		t.Fatalf("Execute(0xF00A) returned error: %v", err)
+	}
+	if c.pc != startPC-2 {
+		t.Errorf("pc = %d, want %d (should rewind when no key is pressed)", c.pc, startPC-2)
+	}
+	if c.register[0] != 0 {
+		t.Errorf("register[0] = %#x, want 0 (VX should be untouched while waiting)", c.register[0])
+	}
+
+	// Restore pc to simulate the next fetch cycle re-running the instruction.
+	c.pc = startPC
+
+	// Now press key 0x7: VX should latch the key and execution should
+	// proceed normally (no rewind).
+	c.key[0x7] = true
+	if err := c.Execute(0xF00A); err != nil {
+		t.Fatalf("Execute(0xF00A) returned error: %v", err)
+	}
+	if c.register[0] != 0x7 {
+		t.Errorf("register[0] = %#x, want %#x", c.register[0], 0x7)
+	}
+	if c.pc != startPC {
+		t.Errorf("pc = %d, want %d (should not rewind once a key is pressed)", c.pc, startPC)
+	}
+}
+
+func TestGetKeyPicksLowestPressedKey(t *testing.T) {
+	c := newTestChip8()
+	c.key[0x3] = true
+	c.key[0x9] = true
+
+	if err := c.Execute(0xF10A); err != nil { // target VX = V1
+		t.Fatalf("Execute(0xF10A) returned error: %v", err)
+	}
+	if c.register[1] != 0x3 {
+		t.Errorf("register[1] = %#x, want %#x (lowest pressed key)", c.register[1], 0x3)
+	}
+}
