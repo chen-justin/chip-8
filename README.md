@@ -22,29 +22,31 @@ go run . -rom .roms/chip8-test-suite-4.2/bin/5-quirks.ch8
 
 `6-keypad.ch8` needs real key input to progress past its first screen, which isn't wired up yet (see Roadmap item 6).
 
+### WASM
+
+`wasm/main.go` compiles the `chip8` package to WebAssembly and exposes it to JavaScript as a global `Chip8` object (`load`, `step`, `tickTimers`, `needsRedraw`, `getDisplay`, `setKey`, `beeping`, `ips`). It holds no emulator logic itself — the browser side is expected to drive timing the same way `main.runLoop` does natively (run `ips()/60` `step()` calls per 60Hz tick, then `tickTimers()` once, then redraw if `needsRedraw()`).
+
+```bash
+GOOS=js GOARCH=wasm go build -o chip8.wasm ./wasm
+cp "$(go env GOROOT)/lib/wasm/wasm_exec.js" .   # Go's JS glue for instantiating the module
+```
+
 ## Feature Checklist
 
 - [x] Implement functionality to display IBM emulator
 - [x] Implement functionality to pass corax+ test
 - [x] Add debug functionality
-- [ ] Flesh out API to control emulator for front-end/graphics
-- [ ] Add WASM compilation
+- [x] Flesh out API to control emulator for front-end/graphics
+- [x] Add WASM compilation
 - [ ] Stand up React/Typescript Front-End to consume WASM application
 - [ ] Implement controls
 - [ ] Debugging tools
 
 ## Known Issues
 
-- [x] Timers (`dt`/`st`) decrement once per instruction in `Execute`, instead of at a fixed 60Hz independent of CPU speed — fixed via `TickTimers()`, called once per tick from `main.runLoop` instead of from `Execute`
-- [x] `render` and `ips` fields on `Chip8` are unused — `render` is now a display-dirty flag read via `NeedsRedraw()`, and `ips` is read via `IPS()` to size each tick's instruction batch
+## TODO Roadmap
 
-## Roadmap
-
-1. [x] Add opcode tests (`chip8_test.go`) before refactoring, so later changes can be made safely
-2. [x] Fix the bugs listed above under Known Issues, confirming each fix against the tests
-3. [ ] Validate against the [Timendus chip8-test-suite](https://github.com/Timendus/chip8-test-suite) (flags test, quirks test) beyond corax+
-4. [ ] Add a `Quirks` struct to make behavior differences across CHIP-8 variants (shift semantics, `Fx55`/`Fx65` index increment, `BNNN` vs `BXNN`) configurable rather than hardcoded
-5. [ ] Split opcode decoding from execution (e.g. per-family methods like `op8XY`, `opF`) to keep `Execute` from growing into one large switch
-6. [ ] Define a stable front-end-facing API on `Chip8` — `Step()`, `TickTimers()`, `NeedsRedraw()` done; `SetKey(k uint8, down bool)` and `Beeping()` still open
-7. [x] Build a real run loop: a 60Hz `time.Ticker` driving ~11 `Step()` calls per tick (700 IPS), then a throttled draw call
-8. [ ] Add a graphical front-end (e.g. [Ebitengine](https://ebitengine.org), which also targets WASM) to replace the terminal `PrintDisplay` output
+- [ ] Validate against the [Timendus chip8-test-suite](https://github.com/Timendus/chip8-test-suite) (flags test, quirks test) beyond corax+
+- [ ] Add a `Quirks` struct to make behavior differences across CHIP-8 variants (shift semantics, `Fx55`/`Fx65` index increment, `BNNN` vs `BXNN`) configurable rather than hardcoded
+- [ ] Add a graphical front-end (e.g. [Ebitengine](https://ebitengine.org), which also targets WASM) to replace the terminal `PrintDisplay` output
+- [ ] Stand up the React/TypeScript front-end that consumes `wasm/`'s `Chip8` global.

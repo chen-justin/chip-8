@@ -398,3 +398,62 @@ func TestNeedsRedraw(t *testing.T) {
 		t.Error("NeedsRedraw() = false after a draw, want true")
 	}
 }
+
+func TestSetKey(t *testing.T) {
+	c := newTestChip8()
+
+	if err := c.SetKey(0xA, true); err != nil {
+		t.Fatalf("SetKey(0xA, true) returned error: %v", err)
+	}
+	if !c.key[0xA] {
+		t.Error("key[0xA] = false after SetKey(0xA, true), want true")
+	}
+
+	if err := c.SetKey(0xA, false); err != nil {
+		t.Fatalf("SetKey(0xA, false) returned error: %v", err)
+	}
+	if c.key[0xA] {
+		t.Error("key[0xA] = true after SetKey(0xA, false), want false")
+	}
+
+	if err := c.SetKey(0x10, true); err == nil {
+		t.Error("SetKey(0x10, true) returned nil error, want an out-of-range error")
+	}
+}
+
+func TestBeeping(t *testing.T) {
+	c := newTestChip8()
+
+	if c.Beeping() {
+		t.Error("Beeping() = true on a fresh Chip8, want false")
+	}
+
+	c.st = 5
+	if !c.Beeping() {
+		t.Error("Beeping() = false with st = 5, want true")
+	}
+
+	c.st = 0
+	if c.Beeping() {
+		t.Error("Beeping() = true with st = 0, want false")
+	}
+}
+
+func TestLoadProgramBytes(t *testing.T) {
+	c := newTestChip8()
+	data := []byte{0x00, 0xE0, 0x12, 0x34}
+
+	if err := c.LoadProgramBytes(data); err != nil {
+		t.Fatalf("LoadProgramBytes returned error: %v", err)
+	}
+	for i, b := range data {
+		if got := c.memory[0x200+i]; got != b {
+			t.Errorf("memory[%#04X] = %#02X, want %#02X", 0x200+i, got, b)
+		}
+	}
+
+	tooBig := make([]byte, len(c.memory))
+	if err := c.LoadProgramBytes(tooBig); err == nil {
+		t.Error("LoadProgramBytes with oversized data returned nil error, want an error")
+	}
+}

@@ -86,10 +86,26 @@ func (c *Chip8) LoadProgram(fileName string) error {
 	if err != nil {
 		return err
 	}
+	return c.LoadProgramBytes(data)
+}
+
+func (c *Chip8) LoadProgramBytes(data []byte) error {
 	if len(data) > len(c.memory)-0x200 { // program is loaded at 0x200
 		return fmt.Errorf("program size %d bigger than available memory %d", len(data), len(c.memory)-0x200)
 	}
 
 	copy(c.memory[0x200:], data)
 	return nil
+}
+
+func (c *Chip8) SetKey(k uint8, down bool) error {
+	if int(k) >= len(c.key) {
+		return fmt.Errorf("key %#X out of range (must be 0x0-0xF)", k)
+	}
+	c.key[k] = down
+	return nil
+}
+
+func (c *Chip8) Beeping() bool {
+	return c.st > 0
 }
