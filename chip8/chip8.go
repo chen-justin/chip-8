@@ -200,14 +200,14 @@ func (c *Chip8) Execute(opcode uint16) error {
 		c.register[0xF] = 0
 		fmt.Println("x,y: ", px, py)
 		for row := 0; row < int(N); row++ {
-			if int(py) >= len(c.display[0]) { // reached bottom edge of screen
-				continue
+			if int(py) >= len(c.display) { // reached bottom edge of screen
+				break;
 			}
 			sbyte := c.memory[c.i+uint16(row)]
 			fmt.Printf("%s %x\n", "s: ", sbyte)
 			px := c.register[X] % 64
 			for bit := 0; bit < 8; bit++ {
-				if int(px) >= len(c.display[px]) { // reached right edge of screen
+				if int(px) >= len(c.display[0]) { // reached right edge of screen
 					break;
 				}
 				spritePixel := (sbyte >> (7 - bit)) & 0x01
