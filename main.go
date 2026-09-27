@@ -10,24 +10,22 @@ import (
 
 func main() {
 	romPath := flag.String("rom", ".roms/3-corax+.ch8", "path to a CHIP-8 ROM file to load")
+	debug := flag.Bool("debug", false, "print verbose per-instruction debug output")
 	flag.Parse()
 
 	c := chip8.Init()
+	c.SetDebug(*debug)
 	if err := c.LoadProgram(*romPath); err != nil {
 		log.Fatalf("failed to load ROM %q: %v", *romPath, err)
 	}
 
-	// c.Debug()
-	// opcode := c.Fetch()
-	// exec := c.Execute(opcode)
-	// fmt.Println(exec)
-	// PrintDisplay(c.GetDisplay())
 	cycle := 0
 	for {
-		c.Debug()
-		fmt.Println("cycle: ", cycle)
 		opcode := c.Fetch()
-		fmt.Printf("opcode: %x\n", opcode)
+		if *debug {
+			fmt.Println("cycle: ", cycle)
+			fmt.Printf("opcode: %x\n", opcode)
+		}
 		c.Debug()
 		e := c.Execute(opcode)
 		if e != nil {

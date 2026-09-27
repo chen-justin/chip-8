@@ -2,6 +2,8 @@ package chip8
 
 import (
 	"fmt"
+	"io"
+	"log"
 	"math/rand"
 	"os"
 )
@@ -38,6 +40,7 @@ type Chip8 struct {
 	key      [16]bool //keydown
 	render   bool
 	ips      int //instructions per second
+	debug    *log.Logger
 }
 
 func Init() Chip8 {
@@ -45,6 +48,7 @@ func Init() Chip8 {
 		pc:     0x200,
 		render: true,
 		ips:    700,
+		debug:  log.New(io.Discard, "", 0), // silent until SetDebug(true)
 	}
 	buffer := 0x50
 	for i := buffer; i < len(fontSet)+buffer; i++ {
@@ -53,20 +57,29 @@ func Init() Chip8 {
 	return instance
 }
 
+// SetDebug turns verbose per-instruction tracing to stdout on or off.
+func (c *Chip8) SetDebug(on bool) {
+	if on {
+		c.debug = log.New(os.Stdout, "", 0)
+	} else {
+		c.debug = log.New(io.Discard, "", 0)
+	}
+}
+
 func (c *Chip8) GetDisplay() [32][64]bool {
 	return c.display
 }
 
 func (c *Chip8) Debug() {
-	fmt.Println("pc:", c.pc)
-	fmt.Println("i:", c.i)
-	fmt.Println("vx:", c.register)
-	fmt.Println("stack:", c.stack)
-	fmt.Printf("sp: %d\n", c.sp)
+	c.debug.Println("pc:", c.pc)
+	c.debug.Println("i:", c.i)
+	c.debug.Println("vx:", c.register)
+	c.debug.Println("stack:", c.stack)
+	c.debug.Printf("sp: %d\n", c.sp)
 }
 
 func (c *Chip8) Fetch() uint16 {
-	fmt.Println("fetching: ", c.pc, "from ", len(c.memory))
+	c.debug.Println("fetching: ", c.pc, "from ", len(c.memory))
 	opcode := uint16(c.memory[c.pc])<<8 | uint16(c.memory[c.pc+1])
 	c.pc += 2
 	return opcode
@@ -81,12 +94,12 @@ func (c *Chip8) Execute(opcode uint16) error {
 	NN := uint8(opcode & 0x00FF)
 	NNN := opcode & 0x0FFF
 
-	// fmt.Printf("%s %x\n", "nibble:", (n1))
-	// fmt.Printf("%s %d\n", "X: ", X)
-	// fmt.Printf("%s %d\n", "Y: ", Y)
-	// fmt.Printf("%s %d\n", "N: ", N)
-	// fmt.Printf("%s %x - %d\n", "NN: ", NN, NN)
-	// fmt.Printf("%s %x - %d\n", "NNN: ", NNN, NNN)
+	c.debug.Printf("%s %x\n", "nibble:", (n1))
+	c.debug.Printf("%s %d\n", "X: ", X)
+	c.debug.Printf("%s %d\n", "Y: ", Y)
+	c.debug.Printf("%s %d\n", "N: ", N)
+	c.debug.Printf("%s %x - %d\n", "NN: ", NN, NN)
+	c.debug.Printf("%s %x - %d\n", "NNN: ", NNN, NNN)
 	switch n1 {
 
 	case 0x0000:
@@ -198,13 +211,13 @@ func (c *Chip8) Execute(opcode uint16) error {
 		px := c.register[X] % 64
 		py := c.register[Y] % 32
 		c.register[0xF] = 0
-		fmt.Println("x,y: ", px, py)
+		c.debug.Println("x,y: ", px, py)
 		for row := 0; row < int(N); row++ {
 			if int(py) >= len(c.display) { // reached bottom edge of screen
 				break;
 			}
 			sbyte := c.memory[c.i+uint16(row)]
-			fmt.Printf("%s %x\n", "s: ", sbyte)
+			c.debug.Printf("%s %x\n", "s: ", sbyte)
 			px := c.register[X] % 64
 			for bit := 0; bit < 8; bit++ {
 				if int(px) >= len(c.display[0]) { // reached right edge of screen
