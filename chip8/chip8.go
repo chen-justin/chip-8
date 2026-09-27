@@ -182,7 +182,7 @@ func (c *Chip8) Execute(opcode uint16) error {
 		c.register[0xF] = 0
 		fmt.Println("x,y: ", px, py)
 		for row := 0; row < int(N); row++ {
-			if int(py) >= len(c.display) { // reached bottom edge of screen
+			if int(py) >= len(c.display[0]) { // reached bottom edge of screen
 				continue
 			}
 			sbyte := c.memory[c.i+uint16(row)]
@@ -190,7 +190,7 @@ func (c *Chip8) Execute(opcode uint16) error {
 			px := c.register[X] % 64
 			for bit := 0; bit < 8; bit++ {
 				if int(px) >= len(c.display[px]) { // reached right edge of screen
-					continue
+					break;
 				}
 				spritePixel := (sbyte >> (7 - bit)) & 0x01
 				// spritePixel := int(sbyte) & bit
@@ -230,7 +230,7 @@ func (c *Chip8) Execute(opcode uint16) error {
 		case 0x0A: // get key
 			c.pc -= 2 // -1?
 		case 0x29: //font character
-			c.i = 0x50 + uint16(c.register[X]) //iffy
+			c.i = 0x50 + uint16(c.register[X]) * 5 // every font character is 5 bytes
 		case 0x33: //binary-coded decimal conversion
 			temp := c.register[X]
 			i := 2
