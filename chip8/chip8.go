@@ -78,11 +78,14 @@ func (c *Chip8) Debug() {
 	c.debug.Printf("sp: %d\n", c.sp)
 }
 
-func (c *Chip8) Fetch() uint16 {
+func (c *Chip8) Fetch() (uint16, error) {
 	c.debug.Println("fetching: ", c.pc, "from ", len(c.memory))
+	if int(c.pc)+1 >= len(c.memory) {
+		return 0, fmt.Errorf("program counter out of bounds: %#04X", c.pc)
+	}
 	opcode := uint16(c.memory[c.pc])<<8 | uint16(c.memory[c.pc+1])
 	c.pc += 2
-	return opcode
+	return opcode, nil
 }
 
 func (c *Chip8) Execute(opcode uint16) error {
@@ -111,8 +114,13 @@ func (c *Chip8) Execute(opcode uint16) error {
 				}
 			}
 		case 0xEE: // return subroutine
+			if c.sp == 0 {
+				return fmt.Errorf("stack underflow: RET with empty call stack")
+			}
 			c.sp -= 1
 			c.pc = c.stack[c.sp]
+		default:
+			return fmt.Errorf("unknown 0x0NNN opcode: %#04X", opcode)
 		}
 	case 0x1000: // jump
 		c.pc = NNN
@@ -194,6 +202,8 @@ func (c *Chip8) Execute(opcode uint16) error {
 			carry := (c.register[X] & 0x80) >> 7
 			c.register[X] = c.register[X] << 1
 			c.register[0xF] = carry
+		default:
+			return fmt.Errorf("unknown 0x8XY%X opcode: %#04X", N, opcode)
 		}
 	case 0x9000: // skip if not true
 		if c.register[X] != c.register[Y] {
@@ -293,7 +303,7 @@ func (c *Chip8) Execute(opcode uint16) error {
 		}
 
 	default:
-		fmt.Printf("Invalid opcode %X\n", opcode)
+		return fmt.Errorf("unknown opcode: %#04X", opcode)
 	}
 
 	if c.dt > 0 {

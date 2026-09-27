@@ -21,7 +21,11 @@ func main() {
 
 	cycle := 0
 	for {
-		opcode := c.Fetch()
+		opcode, ferr := c.Fetch()
+		if ferr != nil {
+			fmt.Println("fetch error:", ferr)
+			break
+		}
 		if *debug {
 			fmt.Println("cycle: ", cycle)
 			fmt.Printf("opcode: %x\n", opcode)
@@ -29,6 +33,7 @@ func main() {
 		c.Debug()
 		e := c.Execute(opcode)
 		if e != nil {
+			fmt.Println("execute error:", e)
 			break
 		}
 		cycle += 1

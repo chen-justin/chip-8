@@ -243,3 +243,73 @@ func TestGetKeyPicksLowestPressedKey(t *testing.T) {
 		t.Errorf("register[1] = %#x, want %#x (lowest pressed key)", c.register[1], 0x3)
 	}
 }
+
+func TestUnknownSubOpcodeReturnsError(t *testing.T) {
+	tests := []struct {
+		name   string
+		opcode uint16
+	}{
+		{"unknown 0x0NNN", 0x00FF},
+		{"unknown 0x8XY?", 0x8009}, // nibble 9 isn't a defined 8XY? operation
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := newTestChip8()
+			startPC := c.pc
+
+			if err := c.Execute(tt.opcode); err == nil {
+				t.Errorf("Execute(%#x) returned nil error, want non-nil", tt.opcode)
+			}
+			if c.pc != startPC {
+				t.Errorf("pc = %d, want unchanged %d after an unknown opcode", c.pc, startPC)
+			}
+		})
+	}
+}
+
+func TestReturnWithEmptyStackErrors(t *testing.T) {
+	c := newTestChip8() // fresh instance: sp == 0, nothing has been called
+
+	if err := c.Execute(0x00EE); err == nil {
+		t.Error("Execute(0x00EE) with an empty call stack returned nil error, want non-nil")
+	}
+	if c.sp != 0 {
+		t.Errorf("sp = %d, want unchanged 0 after a failed RET", c.sp)
+	}
+}
+
+func TestFetch(t *testing.T) {
+	t.Run("valid pc decodes and advances", func(t *testing.T) {
+		c := newTestChip8() // pc starts at 0x200
+		c.memory[0x200] = 0xAB
+		c.memory[0x201] = 0xCD
+
+		opcode, err := c.Fetch()
+		if err != nil {
+			t.Fatalf("Fetch() returned error: %v", err)
+		}
+		if opcode != 0xABCD {
+			t.Errorf("opcode = %#x, want %#x", opcode, 0xABCD)
+		}
+		if c.pc != 0x202 {
+			t.Errorf("pc = %#x, want %#x", c.pc, 0x202)
+		}
+	})
+
+	t.Run("pc past end of memory errors without advancing", func(t *testing.T) {
+		c := newTestChip8()
+		c.pc = uint16(len(c.memory) - 1) // only one byte left: not enough for an opcode
+
+		opcode, err := c.Fetch()
+		if err == nil {
+			t.Error("Fetch() returned nil error, want non-nil")
+		}
+		if opcode != 0 {
+			t.Errorf("opcode = %#x, want 0", opcode)
+		}
+		if c.pc != uint16(len(c.memory)-1) {
+			t.Errorf("pc = %#x, want unchanged %#x", c.pc, len(c.memory)-1)
+		}
+	})
+}

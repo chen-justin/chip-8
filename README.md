@@ -26,7 +26,7 @@ go run . -rom .roms/chip8-test-suite-4.2/bin/5-quirks.ch8
 
 - [x] Implement functionality to display IBM emulator
 - [x] Implement functionality to pass corax+ test
-- [ ] Add debug functionality
+- [x] Add debug functionality
 - [ ] Flesh out API to control emulator for front-end/graphics
 - [ ] Add WASM compilation
 - [ ] Stand up React/Typescript Front-End to consume WASM application
@@ -36,9 +36,7 @@ go run . -rom .roms/chip8-test-suite-4.2/bin/5-quirks.ch8
 ## Known Issues
 
 - [ ] Timers (`dt`/`st`) decrement once per instruction in `Execute`, instead of at a fixed 60Hz independent of CPU speed
-- [ ] Unknown/invalid sub-opcodes (bad `0x0NNN`, `0x8XY?`) and stack underflow on `00EE` fail silently instead of returning an error
 - [ ] `render` and `ips` fields on `Chip8` are unused
-- [ ] Debug `fmt.Print` calls inside `Fetch`/`Execute` run unconditionally instead of being gated behind a debug flag
 
 ## Roadmap
 
