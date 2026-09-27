@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/chen-justin/chip-8/chip8"
 )
@@ -19,29 +20,38 @@ func main() {
 		log.Fatalf("failed to load ROM %q: %v", *romPath, err)
 	}
 
-	cycle := 0
-	for {
-		opcode, ferr := c.Fetch()
-		if ferr != nil {
-			fmt.Println("fetch error:", ferr)
-			break
-		}
-		if *debug {
-			fmt.Println("cycle: ", cycle)
-			fmt.Printf("opcode: %x\n", opcode)
-		}
-		c.Debug()
-		e := c.Execute(opcode)
-		if e != nil {
-			fmt.Println("execute error:", e)
-			break
-		}
-		cycle += 1
-		PrintDisplay(c.GetDisplay())
-		// time.Sleep(1000 / 60 * time.Millisecond) // Slow down output for visibility
-
+	if err := runLoop(&c, *debug); err != nil {
+		fmt.Println(err)
 	}
+}
 
+// runLoop drives the emulator at a fixed 60Hz: each tick runs a batch of
+// IPS/60 instructions, then ticks the timers once and redraws at most once,
+// decoupling both from however fast instructions actually execute.
+func runLoop(c *chip8.Chip8, debug bool) error {
+	const ticksPerSecond = 60
+	instructionsPerTick := c.IPS() / ticksPerSecond
+
+	ticker := time.NewTicker(time.Second / ticksPerSecond)
+	defer ticker.Stop()
+
+	cycle := 0
+	for range ticker.C {
+		for i := 0; i < instructionsPerTick; i++ {
+			if debug {
+				fmt.Println("cycle: ", cycle)
+			}
+			if err := c.Step(); err != nil {
+				return fmt.Errorf("step error: %w", err)
+			}
+			cycle++
+		}
+		c.TickTimers()
+		if c.NeedsRedraw() {
+			PrintDisplay(c.GetDisplay())
+		}
+	}
+	return nil
 }
 
 func PrintDisplay(display [32][64]bool) {

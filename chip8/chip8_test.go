@@ -1,6 +1,9 @@
 package chip8
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 // newTestChip8 gives each test its own fresh, isolated instance.
 func newTestChip8() Chip8 {
@@ -312,4 +315,86 @@ func TestFetch(t *testing.T) {
 			t.Errorf("pc = %#x, want unchanged %#x", c.pc, len(c.memory)-1)
 		}
 	})
+}
+
+func TestTickTimers(t *testing.T) {
+	tests := []struct {
+		name    string
+		startDT uint8
+		startST uint8
+		wantDT  uint8
+		wantST  uint8
+	}{
+		{"both nonzero decrement by one", 10, 5, 9, 4},
+		{"both already zero stay zero", 0, 0, 0, 0},
+		{"one zero one nonzero", 1, 0, 0, 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := newTestChip8()
+			c.dt = tt.startDT
+			c.st = tt.startST
+
+			c.TickTimers()
+
+			if c.dt != tt.wantDT {
+				t.Errorf("dt = %d, want %d", c.dt, tt.wantDT)
+			}
+			if c.st != tt.wantST {
+				t.Errorf("st = %d, want %d", c.st, tt.wantST)
+			}
+		})
+	}
+}
+
+// TestExecuteDoesNotTickTimers is a regression guard: dt/st must only move
+// via TickTimers, never as a side effect of Execute, so timers stay decoupled
+// from however fast instructions run.
+func TestExecuteDoesNotTickTimers(t *testing.T) {
+	opcodes := []uint16{0x6012, 0xA123, 0x00E0, 0x1300}
+
+	for _, opcode := range opcodes {
+		t.Run(fmt.Sprintf("opcode %#x", opcode), func(t *testing.T) {
+			c := newTestChip8()
+			c.dt = 10
+			c.st = 10
+
+			if err := c.Execute(opcode); err != nil {
+				t.Fatalf("Execute(%#x) returned error: %v", opcode, err)
+			}
+			if c.dt != 10 {
+				t.Errorf("dt = %d, want unchanged 10 (Execute must not tick timers)", c.dt)
+			}
+			if c.st != 10 {
+				t.Errorf("st = %d, want unchanged 10 (Execute must not tick timers)", c.st)
+			}
+		})
+	}
+}
+
+func TestNeedsRedraw(t *testing.T) {
+	c := newTestChip8()
+
+	if !c.NeedsRedraw() {
+		t.Error("NeedsRedraw() = false on a fresh Chip8, want true (initial screen)")
+	}
+	if c.NeedsRedraw() {
+		t.Error("NeedsRedraw() = true immediately after being read, want false (clear-on-read)")
+	}
+
+	if err := c.Execute(0x00E0); err != nil { // clear screen
+		t.Fatalf("Execute(0x00E0) returned error: %v", err)
+	}
+	if !c.NeedsRedraw() {
+		t.Error("NeedsRedraw() = false after 00E0, want true")
+	}
+
+	c.i = 0x50 // point at the '0' font glyph
+	if err := c.Execute(0xD001); err != nil { // draw 1-row sprite at V0,V0
+		t.Fatalf("Execute(0xD001) returned error: %v", err)
+	}
+	if !c.NeedsRedraw() {
+		t.Error("NeedsRedraw() = false after a draw, want true")
+	}
 }

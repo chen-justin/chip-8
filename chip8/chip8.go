@@ -113,6 +113,7 @@ func (c *Chip8) Execute(opcode uint16) error {
 					c.display[i][j] = false
 				}
 			}
+			c.render = true
 		case 0xEE: // return subroutine
 			if c.sp == 0 {
 				return fmt.Errorf("stack underflow: RET with empty call stack")
@@ -246,6 +247,7 @@ func (c *Chip8) Execute(opcode uint16) error {
 			}
 			py += 1
 		}
+		c.render = true
 	case 0xE000:
 		switch NN {
 		case 0x9E:
@@ -306,14 +308,40 @@ func (c *Chip8) Execute(opcode uint16) error {
 		return fmt.Errorf("unknown opcode: %#04X", opcode)
 	}
 
-	if c.dt > 0 {
-		c.dt -= 1
-	}
-
-	if c.st > 0 {
-		c.st -= 1
-	}
 	return nil
+}
+
+// Step fetches and executes a single instruction.
+func (c *Chip8) Step() error {
+	opcode, err := c.Fetch()
+	if err != nil {
+		return err
+	}
+	return c.Execute(opcode)
+}
+
+// TickTimers decrements the delay and sound timers by one, flooring at zero.
+// Call this at a fixed 60Hz, independent of how fast instructions run.
+func (c *Chip8) TickTimers() {
+	if c.dt > 0 {
+		c.dt--
+	}
+	if c.st > 0 {
+		c.st--
+	}
+}
+
+// NeedsRedraw reports whether the display has changed since the last call,
+// clearing the flag as it does.
+func (c *Chip8) NeedsRedraw() bool {
+	needs := c.render
+	c.render = false
+	return needs
+}
+
+// IPS returns the configured instructions-per-second rate.
+func (c *Chip8) IPS() int {
+	return c.ips
 }
 
 func (c *Chip8) LoadProgram(fileName string) error {
