@@ -35,16 +35,16 @@ go run . -rom .roms/chip8-test-suite-4.2/bin/5-quirks.ch8
 
 ## Known Issues
 
-- [ ] Timers (`dt`/`st`) decrement once per instruction in `Execute`, instead of at a fixed 60Hz independent of CPU speed
-- [ ] `render` and `ips` fields on `Chip8` are unused
+- [x] Timers (`dt`/`st`) decrement once per instruction in `Execute`, instead of at a fixed 60Hz independent of CPU speed — fixed via `TickTimers()`, called once per tick from `main.runLoop` instead of from `Execute`
+- [x] `render` and `ips` fields on `Chip8` are unused — `render` is now a display-dirty flag read via `NeedsRedraw()`, and `ips` is read via `IPS()` to size each tick's instruction batch
 
 ## Roadmap
 
 1. [x] Add opcode tests (`chip8_test.go`) before refactoring, so later changes can be made safely
-2. [ ] Fix the bugs listed above under Known Issues, confirming each fix against the tests
+2. [x] Fix the bugs listed above under Known Issues, confirming each fix against the tests
 3. [ ] Validate against the [Timendus chip8-test-suite](https://github.com/Timendus/chip8-test-suite) (flags test, quirks test) beyond corax+
 4. [ ] Add a `Quirks` struct to make behavior differences across CHIP-8 variants (shift semantics, `Fx55`/`Fx65` index increment, `BNNN` vs `BXNN`) configurable rather than hardcoded
 5. [ ] Split opcode decoding from execution (e.g. per-family methods like `op8XY`, `opF`) to keep `Execute` from growing into one large switch
-6. [ ] Define a stable front-end-facing API on `Chip8`: `Step()`, `TickTimers()`, `SetKey(k uint8, down bool)`, `Display()`, `Beeping()`
-7. [ ] Build a real run loop: a 60Hz `time.Ticker` driving ~11 `Step()` calls per tick (700 IPS), then a draw call
+6. [ ] Define a stable front-end-facing API on `Chip8` — `Step()`, `TickTimers()`, `NeedsRedraw()` done; `SetKey(k uint8, down bool)` and `Beeping()` still open
+7. [x] Build a real run loop: a 60Hz `time.Ticker` driving ~11 `Step()` calls per tick (700 IPS), then a throttled draw call
 8. [ ] Add a graphical front-end (e.g. [Ebitengine](https://ebitengine.org), which also targets WASM) to replace the terminal `PrintDisplay` output
